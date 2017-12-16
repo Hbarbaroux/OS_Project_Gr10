@@ -7,9 +7,8 @@
 #include <math.h>
 #include <bluetooth/bluetooth.h>
 #include <bluetooth/rfcomm.h>
-#include <compass_sensor.h>
 
-#define SERV_ADDR   "dc:53:60:ad:61:90"     /* Whatever the address of the server is */
+#define SERV_ADDR   "30:E3:7A:10:9F:28"     /* Whatever the address of the server is */
 #define TEAM_ID     10                       /* Your team ID */
 
 #define MSG_ACK     0
@@ -31,6 +30,35 @@ void debug (const char *fmt, ...) {
   va_end (argp);
 }
 
+int str2ba(const char *str,bdaddr_t *ba)
+
+
+{
+       uint8_t b[6];
+       const char *ptr = str;
+       int i;
+
+       for (i = 0; i < 6; i++) {
+              b[i] = (uint8_t) strtol(ptr, NULL, 16);
+              if (i != 5 && !(ptr = strchr(ptr, ':')))
+                     ptr = ":00:00:00:00:00";
+              ptr++;
+       }
+
+       baswap(ba, (bdaddr_t *) b);
+
+       return 0;
+}
+
+void baswap(bdaddr_t * dst,const bdaddr_t * src)
+{
+       register unsigned char *d = (unsigned char *) dst;
+       register const unsigned char *s = (const unsigned char *) src;
+       register int i;
+
+       for (i = 0; i < 6; i++)
+              d[i] = s[5-i];
+}
 
 int s;
 
@@ -50,9 +78,10 @@ int read_from_server (int sock, char *buffer, size_t maxSize) {
   return bytes_read;
 }
 
-void send_position (int x, int y){
 
-  printf("I'm sending my position...\n", );
+void send_position (double x, double y){
+
+  printf("I'm sending my position...\n");
 
   char string[9];
   char type;
@@ -66,16 +95,16 @@ void send_position (int x, int y){
   string[7] = y;              /* y */
   string[8]= 0x00;
   write(s, string, 9);
-  Sleep(20);
 
-  printf("Done sending my position...\n", );
+  printf("Done sending my position...\n");
 
 }
 
-int connect_and_send(){
-/*int main(int argc, char **argv)*/
+int connect_server(void){
+
   struct sockaddr_rc addr = { 0 };
   int status;
+  char string[9];
 
   /* allocate a socket */
   s = socket(AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM);
@@ -98,24 +127,20 @@ int connect_and_send(){
     }
 
     while(1){
-    int x = get_x_coord();
-    int y = get_y_coord();
-
-    send_begin_position(x,y);
-
-    sleep(2);
-
     //Wait for stop message
     read_from_server (s, string, 58);
-    type = string[4];
-    if (type ==MSG_STOP){
-      break;
+    if (string[4]==MSG_STOP){
+      close(s);
+      return;
     }
+
     close (s);
 
     sleep (5);
 
-  } else {
+  }
+   }
+    else {
     fprintf (stderr, "Failed to connect to server...\n");
     sleep (2);
     exit (EXIT_FAILURE);
@@ -124,3 +149,4 @@ int connect_and_send(){
   close(s);
   return 0;
 }
+
