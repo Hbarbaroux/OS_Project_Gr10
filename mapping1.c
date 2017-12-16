@@ -66,7 +66,7 @@ int moving;   /* Current moving */
 int command;  /* Command for the 'drive' coroutine */
 
 uint8_t ir, touch;  /* Sequence numbers of sensors */
-uint8_t sonar, color, compas;  /* Sequence  of sensors */
+uint8_t sonar, color, compas, front_arm, back_arm;  /* Sequence  of sensors */
 enum { L, R };
 uint8_t motor[ 3 ] = { DESC_LIMIT, DESC_LIMIT, DESC_LIMIT };  /* Sequence numbers of motors */
 
@@ -261,9 +261,34 @@ void move_with_obstacle() {
 	Sleep(10000);
 }
 
-void take_obstacle() {}
+void take_obstacle(uint8_t front_arm) {
+	set_tacho_stop_action_inx( front_arm, TACHO_COAST );
+	set_tacho_speed_sp( front_arm, arm_max_speed / 2 );
+	set_tacho_ramp_up_sp( front_arm, 0 );
+	set_tacho_ramp_down_sp( front_arm, 0 );
+	set_tacho_position_sp( front_arm, 90 ); //angle
+	set_tacho_command_inx( front_arm, TACHO_RUN_TO_REL_POS );
+//turn around
+	set_tacho_stop_action_inx( front_arm, TACHO_COAST );
+	set_tacho_speed_sp( front_arm, arm_max_speed / 2 );
+	set_tacho_ramp_up_sp( front_arm, 0 );
+	set_tacho_ramp_down_sp( front_arm, 0 );
+	set_tacho_position_sp( front_arm, -90 ); //angle
+	set_tacho_command_inx( front_arm, TACHO_RUN_TO_REL_POS );
+	Sleep( 500 );
+}
 
-void release_obstacle() {}
+void release_obstacle(uint8_t back_arm) {
+	set_tacho_stop_action_inx( back_arm, TACHO_COAST );
+	set_tacho_speed_sp( back_arm, arm_max_speed / 2 );
+	set_tacho_ramp_up_sp( back_arm, 0 );
+	set_tacho_ramp_down_sp( back_arm, 0 );
+	set_tacho_position_sp( back_arm, 90 ); //angle
+	Sleep( 500 );
+	set_tacho_position_sp( back_arm, -90 ); //angle
+	set_tacho_command_inx( back_arm, TACHO_RUN_TO_REL_POS );
+	Sleep( 500 );
+}
 
 void move_without_obstacle() {}
 
@@ -443,6 +468,11 @@ int main( void )
 	if ( !ev3_search_sensor( LEGO_EV3_COLOR, &color, 0 )) {
                 printf("## Color not found\n");
         }
+
+    get_tacho_max_speed( back_arm, &arm_max_speed );
+    set_tacho_stop_action_inx( back_arm, TACHO_COAST );
+    get_tacho_max_speed( front_arm, &arm_max_speed );
+    set_tacho_stop_action_inx( front_arm, TACHO_COAST );
 
 	printf( "start\n" );
 
