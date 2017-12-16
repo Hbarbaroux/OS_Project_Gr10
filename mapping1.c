@@ -61,19 +61,15 @@ enum {
 	STEP_BACKWARD,
 };
 
+
 int moving;   /* Current moving */
 int command;  /* Command for the 'drive' coroutine */
-int angle;    /* Angle of rotation */
 
 uint8_t ir, touch;  /* Sequence numbers of sensors */
 uint8_t sonar, color, compas;  /* Sequence  of sensors */
 enum { L, R };
 uint8_t motor[ 3 ] = { DESC_LIMIT, DESC_LIMIT, DESC_LIMIT };  /* Sequence numbers of motors */
 
-typedef struct data {
-    int var;
-    pthread_mutex_t mutex;
-} data;
 
 static void _set_mode( int value )
 {
@@ -126,7 +122,7 @@ static int _is_running( void )
 
 static void _stop( void )
 {
-	multi_set_tacho_command_inx( motor, TACHO_STOP );
+	multi_set_tacho_command_inx(motor, TACHO_STOP);
 }
 
 int app_init( void )
@@ -175,8 +171,6 @@ int app_init( void )
 	printf( "Press BACK on the EV3 brick for EXIT...\n" );
 	return ( 1 );
 }
-
-
 
 
 /* Coroutine of control the motors */
@@ -240,6 +234,39 @@ CORO_DEFINE( drive )
 	CORO_END();
 }
 
+
+//////////////////////
+// GLOBAL VARIABLES //
+//////////////////////
+
+
+double x,y;
+int angle = 0;
+
+pthread_mutex_t mutexCoord = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutexAng = PTHREAD_MUTEX_INITIALIZER;
+
+
+////////////////////////////////
+// BEGINNING OF OUR FUNCTIONS //
+////////////////////////////////
+
+void reset_coord() {
+	x=0;
+	y=0;
+}
+
+void move_with_obstacle() {
+	_run_to_rel_pos(100,720,-100,-720);
+	Sleep(10000);
+}
+
+void take_obstacle() {}
+
+void release_obstacle() {}
+
+void move_without_obstacle() {}
+
 bool non_movable_encountered() {
 	Sleep(10000);
 	return true;
@@ -250,7 +277,7 @@ int there_is_obstacle()
   float us_value;
   get_sensor_value0(sonar, &us_value);
   // printf("%f\n", us_value);
-  if ( us_value <=  100) 
+  if ( us_value <=  50) 
     return 1;
   return 0;
 }
@@ -258,7 +285,7 @@ int there_is_obstacle()
 int what_kind_of_obstacle() 
 {
     int color_value;
-    if ( !get_sensor_value( 0, color, &color_value ) || ( color_value < 0 ) || ( color_value >= COLOR_COUNT )) {
+    if ( !get_sensor_value(0, color, &color_value ) || ( color_value < 0 ) || ( color_value >= COLOR_COUNT )) {
         color_value = 0;
     }
     printf( "\r(%s)\n", color_list[ color_value ]);
@@ -293,13 +320,6 @@ void turn_right() {
 	_run_to_rel_pos(100,180,-100,-180);
 }
 
-double x,y;
-int angle = 0;
-
-void reset_coord() {
-	x=0;
-	y=0;
-}
 
 void update_coord(double diff, int angle) {
 	switch (angle) {
@@ -318,8 +338,11 @@ void update_coord(double diff, int angle) {
 	}
 }
 
-pthread_mutex_t mutexCoord = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t mutexAng = PTHREAD_MUTEX_INITIALIZER;
+
+///////////////////////
+// THREADS FUNCTIONS //
+///////////////////////
+
 
 void *thread_get_coord(void *arg)
 {
@@ -336,10 +359,12 @@ void *thread_set_coord(void *arg)
 {
     double diff;
     int speed1;
+    int speed2;
     for (;;) {
     	Sleep(100);
     	get_tacho_speed_sp(motor[L],&speed1);
-	if ((speed1 != 100) || (speed1 != -100)) {
+	get_tacho_speed_sp(motor[R],&speed2);
+	if ((speed1 != 0) && (speed1 == speed2)) {
     		diff = (0.1)*((double)speed1*M_PI*5.5/360.0+1);
         	pthread_mutex_lock (&mutexCoord);
 		pthread_mutex_lock (&mutexAng);
@@ -351,8 +376,36 @@ void *thread_set_coord(void *arg)
     pthread_exit(NULL);
 }
 
+
+
+//////////////////
+// MAIN PROGRAM //
+//////////////////
+
+
+
 int main( void )
 {
+
+	// DECLARATIONS //
+
+	srand(time(NULL));
+	reset_coord();
+	set_sensor_mode(color, "COL-COLOR" );
+	int randomBit;
+	struct timespec tstart={0,0}, tend={0,0};
+	int speed = 180;
+	double diff_sec,diff_cm;
+	int i;
+	int realSpeed;
+	double diff;
+
+	//////////////////
+
+
+
+	// INITIALIZATION OF THE THREADS //
+
 	pthread_t threadGetCoord;
 	pthread_t threadSetCoord;
 
@@ -361,74 +414,110 @@ int main( void )
     		return EXIT_FAILURE;
     	}
 
-    	if (pthread_create(&threadSetCoord, NULL, thread_set_coord, NULL)) {
-    		perror("pthread_create for thread_set_coord\n");
-    		return EXIT_FAILURE;
-    	}
+    if (pthread_create(&threadSetCoord, NULL, thread_set_coord, NULL)) {
+    	perror("pthread_create for thread_set_coord\n");
+    	return EXIT_FAILURE;
+    }
 
-	reset_coord();
+    //////////////////////////////////
+
+	
+
+    // INITIALIZATION OF THE ROBOT //
+
 	printf("(%f,%f)\n",x,y);
-	srand(time(NULL));
-	// To the north: angle = 0, to the east: angle = 1, to the south: angle = 2, to the west: angle = 3
-
-	int randomBit;
-
-	if(ev3_search_sensor( LEGO_EV3_US, &sonar, 0 )) printf("%s\n", "US found");
-	struct timespec tstart={0,0}, tend={0,0};
-	int speed = 360;
 
 	printf( "Waiting the EV3 brick online...\n" );
 	if ( ev3_init() < 1 ) return ( 1 );
 
 	printf( "*** ( EV3 ) Hello! ***\n" );
+
 	ev3_sensor_init();
 	ev3_tacho_init();
 
 	app_alive = app_init();
+
 	if ( !ev3_search_sensor( LEGO_EV3_US, &sonar, 0 )) {
 		printf("## Sonar not found\n");
 	}
+	if ( !ev3_search_sensor( LEGO_EV3_COLOR, &color, 0 )) {
+                printf("## Color not found\n");
+        }
+
 	printf( "start\n" );
 
-	double diff_sec,diff_cm;
-	int i;
+	/////////////////////////////////
+
+
+
+	// MAIN LOOP //
 
 	for (i = 0; i<4; i++) {
-		clock_gettime(CLOCK_MONOTONIC, &tstart);
+
+
+		// TEST FOR N/S OR E/W DIRECTIONS //
+
+		if (angle % 2 == 0) {
         	_run_forever(speed,speed);
-
-		// loop when the robot goes straight until it sees an object
-		for (;;){
-
-			if (there_is_obstacle()) {
-				clock_gettime(CLOCK_MONOTONIC, &tend);
-				_stop();
-
-				//diff_sec = ((double)tend.tv_sec + 1.0e-9*tend.tv_nsec) - ((double)tstart.tv_sec + 1.0e-9*tstart.tv_nsec);
-				//diff_cm = (diff_sec)*((double)speed*M_PI*5.5/360.0+1);
-				//update_coord(diff_cm,angle);
-				//printf("%f\n", diff_cm);
-				//printf("(%f,%f)\n",x,y);
-			break;
-			}
+			while (!there_is_obstacle());
+            _stop();
 		}
 
-		randomBit = rand() % 2;
-		pthread_mutex_lock (&mutexAng);
-		if (randomBit == 0) {
-			turn_left();
-			angle = MOD(angle-1,4);
+		else {
+			clock_gettime(CLOCK_MONOTONIC, &tstart);
+			_run_timed(speed,speed, 500000.0/(double)speed);
+			printf("%f\n",500000.0/(double)speed);
+			clock_gettime(CLOCK_MONOTONIC, &tend);
+			diff = ((double)tend.tv_sec + 1.0e-9*tend.tv_nsec) - ((double)tstart.tv_sec + 1.0e-9*tstart.tv_nsec);
+			while ((!there_is_obstacle()) && (diff < 500.0/(double)speed)) {
+				clock_gettime(CLOCK_MONOTONIC, &tend);
+				diff = ((double)tend.tv_sec + 1.0e-9*tend.tv_nsec) - ((double)tstart.tv_sec + 1.0e-9*tstart.tv_nsec);
+				//printf("%f,\n",diff);
+			}
+			printf("1\n");
+			_stop();
+		}
+
+		///////////////////////////////////
+
+
+
+		// TEST FOR OBSTACLE DETECTION //
+		
+		if (there_is_obstacle() && what_kind_of_obstacle()) {
+			take_obstacle();
+			move_with_obstacle();
+			release_obstacle();
+			move_without_obstacle();
 		}
 		else {
-			turn_right();
-			angle = MOD(angle+1,4);
+			randomBit = rand() % 2;
+			pthread_mutex_lock (&mutexAng);
+			if (randomBit == 0) {
+				turn_left();
+				angle = MOD(angle-1,4);
+			}
+			else {
+				turn_right();
+				angle = MOD(angle+1,4);
+			}
+			pthread_mutex_unlock (&mutexAng);
+			Sleep(3000);
 		}
-		pthread_mutex_unlock (&mutexAng);
-		Sleep(3000);
+
+		/////////////////////////////////
 	}
+
+	////////////////
+
+
+
+	// UNINIT //
 
 	ev3_uninit();
 	printf( "*** ( EV3 ) Bye! ***\n" );
+	
+	////////////
 
 	return ( 0 );
 }
