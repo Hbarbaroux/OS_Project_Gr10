@@ -85,8 +85,8 @@ int command;  /* Command for the 'drive' coroutine */
 
 uint8_t ir, touch;  /* Sequence numbers of sensors */
 uint8_t sonar, color, compas;  /* Sequence  of sensors */
-enum { L, R };
-uint8_t motor[ 3 ] = { DESC_LIMIT, DESC_LIMIT, DESC_LIMIT };  /* Sequence numbers of motors */
+enum { L, R, M, S };
+uint8_t motor[ 4 ] = { DESC_LIMIT, DESC_LIMIT, DESC_LIMIT , DESC_LIMIT};  /* Sequence numbers of motors */
 
 
 static void _set_mode( int value )
@@ -266,6 +266,9 @@ int s;
 char string[9];
 int stop;
 uint16_t msgId = 0;
+int angle_compass; /* value read from compass sensor */
+int max_speed;  /* Motor maximal speed */
+int back_arm_max_speed;
 
 pthread_mutex_t mutexCoord = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutexAng = PTHREAD_MUTEX_INITIALIZER;
@@ -284,16 +287,42 @@ void reset_coord() {
 	y=0;
 }
 
-void move_with_obstacle() {
-	_run_to_rel_pos(100,720,-100,-720);
-	Sleep(10000);
+void _take_front_obstacle() {
+	set_tacho_speed_sp( motor[S], -100 );
+	//set_tacho_speed_sp( motor[ R ], r_speed );
+	set_tacho_position_sp( motor[S], -60 );
+	//set_tacho_position_sp( motor[ R ], r_pos );
+	set_tacho_command_inx( motor[S], TACHO_RUN_TO_REL_POS );
+	Sleep(500);
+
 }
 
-void take_obstacle() {}
+void _release_front_obstacle() {
+	set_tacho_speed_sp( motor[S], 100 );
+	//set_tacho_speed_sp( motor[ R ], r_speed );
+	set_tacho_position_sp( motor[S], 65 );
+	//set_tacho_position_sp( motor[ R ], r_pos );
+	set_tacho_command_inx( motor[S], TACHO_RUN_TO_REL_POS );
+	printf("release inside\n");
+	Sleep(500);
+}
 
-void release_obstacle() {}
+void _release_obstacle(){
+	set_tacho_speed_sp( motor[M], -180 );
+	//set_tacho_speed_sp( motor[ R ], r_speed );
+	set_tacho_position_sp( motor[M], -60 );
+	//set_tacho_position_sp( motor[ R ], r_pos );
+	set_tacho_command_inx( motor[M], TACHO_RUN_TO_REL_POS );
+	Sleep(1200);
 
-void move_without_obstacle() {}
+	set_tacho_speed_sp( motor[M], 180 );
+	//set_tacho_speed_sp( motor[ R ], r_speed );
+	set_tacho_position_sp( motor[M], 60 );
+	//set_tacho_position_sp( motor[ R ], r_pos );
+	set_tacho_command_inx( motor[M], TACHO_RUN_TO_REL_POS );
+	printf("release inside\n");
+	Sleep(1200);
+}
 
 bool non_movable_encountered() {
 	Sleep(10000);
@@ -341,11 +370,59 @@ int detection(){
 }
 
 void turn_left() {
-	_run_to_rel_pos(-100,-180,100,180);
+	multi_set_tacho_stop_action_inx( motor, TACHO_BRAKE );
+	printf("turning left 90 start\n");
+
+	pthread_mutex_lock (& mutexCompass );
+	int original = angle_compass;
+	pthread_mutex_unlock (& mutexCompass );
+
+	_run_to_rel_pos(150,160,-150,-160);
+	Sleep(1000);
+	_stop();
+	printf("11111111turning left 90 , previous= %d,   now=% d\n", original,angle_compass);
+	_run_forever(10,-10);
+	Sleep(10);
+	if (original<90){
+
+		//while( angle_compass < 90  || abs(angle_compass - original)>=270);
+		while( angle_compass - original >= 270);
+		_stop();
+	}
+	else{
+		while( original - angle_compass <=89);
+		_stop();
+	}
+	_stop();
+	printf("turning left 90 , previous= %d,   now=% d\n", original,angle_compass);
 }
 
 void turn_right() {
-	_run_to_rel_pos(100,180,-100,-180);
+	multi_set_tacho_stop_action_inx( motor, TACHO_BRAKE );
+
+	printf("turning right 90 start\n");
+	
+	pthread_mutex_lock (& mutexCompass );
+	int original = angle_compass;
+	pthread_mutex_unlock (& mutexCompass );
+
+	_run_to_rel_pos(-150,-160,150,160);
+	Sleep(1000);
+	_stop();
+	printf("11111111turning right 90 , previous= %d,   now=% d\n", original,angle_compass);	
+	_run_forever(-10,10);
+	Sleep(10);
+	if (original>270){
+		//while( angle_compass >270 || abs(angle_compass - original)>=270);
+		while( original - angle_compass >=270);
+		_stop();
+	}
+	else{
+		while( angle_compass - original <=89);
+		_stop();
+	}
+	_stop();
+	printf("turning right 90 , previous= %d,   now=% d\n", original,angle_compass);
 }
 
 
@@ -503,6 +580,15 @@ void *thread_read_server(void *arg) {
     pthread_exit(NULL);
 }
 
+void *thread_read_compass(void *arg) {         
+    for (;;) {
+    	pthread_mutex_lock (& mutexCompass );
+    	get_sensor_value( 0, compass, &angle_compass );
+    	pthread_mutex_unlock (& mutexCompass );
+    }
+    pthread_exit(NULL);
+}
+
 
 
 //////////////////
@@ -567,6 +653,7 @@ int main( void )
     pthread_t threadSetCoord;
     pthread_t threadSendPosition;
     pthread_t threadReadServer;
+    pthread_t threadReadCompass;
         
     if (pthread_create(&threadSendPosition, NULL, thread_send_position, NULL)) {
         perror("pthread_create for thread_send_position\n");
@@ -582,6 +669,11 @@ int main( void )
         perror("pthread_create for thread_read_server\n");
         return EXIT_FAILURE;
     }
+
+    if (pthread_create(&threadReadCompass, NULL, thread_read_compass, NULL)) {
+    	perror("pthread_create for thread_read_compass\n");
+    	return EXIT_FAILURE;
+    } 
 
     //////////////////////////////////
         
@@ -606,6 +698,9 @@ int main( void )
 	}
 	if ( !ev3_search_sensor( LEGO_EV3_COLOR, &color, 0 )) {
         printf("## Color not found\n");
+    }
+    if ( ev3_search_sensor( HT_NXT_COMPASS, &compass, 0 )) {
+    	printf( "HT_NXT_COMPASS sensor is found\n" );
     }
 
 	printf( "start\n" );
@@ -653,10 +748,10 @@ int main( void )
 		// TEST FOR OBSTACLE DETECTION //
 		
 		if (there_is_obstacle() && what_kind_of_obstacle()) {
-			take_obstacle();
-			move_with_obstacle();
-			release_obstacle();
-			move_without_obstacle();
+			take__front_obstacle();
+			turn_right();
+			release__front_obstacle();
+			turn_left();
 		}
 		else {
 			randomBit = rand() % 2;
