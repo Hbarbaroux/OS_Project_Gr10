@@ -39,6 +39,7 @@ const char const *color_list[] = { "?", "BLACK", "BLUE", "GREEN", "YELLOW", "RED
 #define SPEED_CIRCULAR    50  /* ... for circular motion */
 
 int max_speed;  /* Motor maximal speed */
+int direction[]= {0,0,0,0};  /* save the direction of north east west  */
 
 #define DEGREE_TO_COUNT( d )  (( d ) * 260 / 90 )
 
@@ -182,70 +183,6 @@ int app_init( void )
 }
 
 
-
-
-/* Coroutine of control the motors */
-CORO_DEFINE( drive )
-{
-	CORO_LOCAL int speed_linear, speed_circular;
-	CORO_LOCAL int _wait_stopped;
-
-	CORO_BEGIN();
-	speed_linear = max_speed * SPEED_LINEAR / 100;
-	speed_circular = max_speed * SPEED_CIRCULAR / 100;
-
-	for ( ; ; ) {
-		/* Waiting new command */
-		CORO_WAIT( moving != command );
-
-		_wait_stopped = 0;
-		switch ( command ) {
-
-		case MOVE_NONE:
-			_stop();
-			_wait_stopped = 1;
-			break;
-
-		case MOVE_FORWARD:
-			_run_forever( -speed_linear, -speed_linear );
-			break;
-
-		case MOVE_BACKWARD:
-			_run_forever( speed_linear, speed_linear );
-			break;
-
-		case TURN_LEFT:
-			_run_forever( speed_circular, -speed_circular );
-			break;
-
-		case TURN_RIGHT:
-			_run_forever( -speed_circular, speed_circular );
-			break;
-
-		case TURN_ANGLE:
-			_run_to_rel_pos( speed_circular, DEGREE_TO_COUNT( -angle )
-			, speed_circular, DEGREE_TO_COUNT( angle ));
-			_wait_stopped = 1;
-			break;
-
-		case STEP_BACKWARD:
-			_run_timed( speed_linear, speed_linear, 1000 );
-			_wait_stopped = 1;
-			break;
-		}
-		moving = command;
-
-		if ( _wait_stopped ) {
-			/* Waiting the command is completed */
-			CORO_WAIT( !_is_running());
-
-			command = moving = MOVE_NONE;
-		}
-	}
-	CORO_END();
-}
-
-   ///GLOBAL VARIABLES////
 
 double x,y;
 int angle = 0;
@@ -477,15 +414,30 @@ void *thread_read_server(void *arg){
     pthread_exit(NULL);
 }
 
-void *thread_read_compass(void *arg) {         
+void *thread_read_compass(void *arg)
+{    
+
+
+	//generate the north south east and west(direction 0~3)
+	pthread_mutex_lock (& mutexCompass );
+    get_sensor_value( 0, compass, &angle_compass );
+    direction[0]=angle_compass;
+    //printf("\nangle= %d\n",angle_compass);
+    pthread_mutex_unlock (& mutexCompass );
+    direction[1]= (direction[0]+90) % 360;
+    direction[2]= (direction[1]+90) % 360;
+    direction[3]= (direction[2]+90) % 360;   
+    //     
     for (;;) {
+    	//Sleep(1);
     	pthread_mutex_lock (& mutexCompass );
     	get_sensor_value( 0, compass, &angle_compass );
+    	//printf("\nangle= %d\n",angle_compass);
     	pthread_mutex_unlock (& mutexCompass );
+
     }
     pthread_exit(NULL);
 }
-
 
 int main( void )
 {
