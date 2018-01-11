@@ -211,6 +211,38 @@ void *thread_set_coord(void *arg) {
     pthread_exit(NULL);
 }
 
+
+// Thread to be used with update_coord_compass
+/*
+void *thread_set_coord(void *arg) {
+    double diff;
+    int speed1;
+    int speed2;
+    for (;;) {
+        pthread_mutex_lock (& mutexCompass );
+        int angle_before = angle_compass;
+        pthread_mutex_unlock (& mutexCompass );
+        Sleep(50);
+        pthread_mutex_lock (& mutexCompass );
+        int angle_after = angle_compass;
+        pthread_mutex_unlock (& mutexCompass );
+        get_tacho_speed_sp(motor[L],&speed1);
+        get_tacho_speed_sp(motor[R],&speed2);
+        if ((speed1 != 0) && (speed1 == speed2)) {
+            diff = (0.1)*((double)speed1*M_PI*5.5/360.0+1);
+            pthread_mutex_lock (&mutexCoord);
+            pthread_mutex_lock (&mutexAng);
+            update_coord_compass(diff, (int) (angle_after + angle_before)/2)	;
+            pthread_mutex_unlock (&mutexAng);
+            pthread_mutex_unlock (&mutexCoord);
+        }
+    }
+    pthread_exit(NULL);
+}
+*/
+
+
+
 void *thread_send_position(void *arg)
 {
     for(;;){

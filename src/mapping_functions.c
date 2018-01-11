@@ -83,6 +83,18 @@ void update_coord(double diff, int angle) {
 }
 
 
+void update_coord_compass(double diff, double angle) {
+    double diffx;
+    double diffy;
+    int diff_angle = (direction[0] - angle)%360;
+    double value = (double) diff_angle * M_PI / 180.0;
+    diffx = diff * sin(value);
+    diffy = diff * cos(value);
+    x = x + diffx;
+    y = y + diffy;
+}
+
+
 void draw_map(int i, int j, int type) {
 	
 	switch (type) {
