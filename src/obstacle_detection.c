@@ -74,6 +74,12 @@ int there_is_obstacle() {
   return 0;
 }
 
+int distance_to_obstacle() {
+	float dist_value;
+	get_sensor_value0(sonar, &dist_value);
+	return dist_value;
+}
+
 int what_kind_of_obstacle() {
     int color_value;
     if ( !get_sensor_value( 0, color, &color_value ) || ( color_value < 0 ) || ( color_value >= COLOR_COUNT )) {

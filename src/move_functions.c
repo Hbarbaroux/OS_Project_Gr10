@@ -48,6 +48,10 @@
 
 #define SPEED_LINEAR      180
 #define SPEED_CIRCULAR    100
+#define SCAN_ANGLE		  40
+int dist_to_obstacle = 100000;
+int final_angle;
+
 
 enum { L, R };
 
@@ -284,5 +288,34 @@ void turn_right() {
 	//printf("turning right 90 , previous= %d,   now=% d\n", original,angle_compass);
 }
 
+int searching_obstacle_right(){
+	int angle;
 
+	for (angle=0;angle<SCAN_ANGLE;angle=angle+5){
+		turn_right_certain_degree(5);
+		if (distance_to_obstacle()<dist_to_obstacle){
+			dist_to_obstacle=distance_to_obstacle();
+			final_angle=angle;
+		}
+	}
+	Sleep(1000);
 
+	turn_left_certain_degree(SCAN_ANGLE);
+	return angle;
+}
+
+int searching_obstacle_left(){
+	int angle;
+
+	for (angle=0;angle<SCAN_ANGLE;angle=angle+5){
+		turn_left_certain_degree(5);
+		if (distance_to_obstacle()<dist_to_obstacle){
+			dist_to_obstacle=distance_to_obstacle();
+			final_angle=angle;
+		}
+	}
+	Sleep(1000);
+
+	turn_right_certain_degree(SCAN_ANGLE);
+	return angle;
+}

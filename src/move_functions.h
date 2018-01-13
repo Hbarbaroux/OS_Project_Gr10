@@ -20,4 +20,6 @@ void turn_left(void);
 
 void turn_right(void);
 
+int searching_obstacle_right();
 
+int searching_obstacle_left();
