@@ -8,11 +8,24 @@
 #include <bluetooth/bluetooth.h>
 #include <bluetooth/rfcomm.h>
 #include <sys/types.h>
+
+#ifndef MAPPING
+#define MAPPING
+
 #include "mapping_functions.h"
 
+#endif
 
-//#define SERV_ADDR   "30:E3:7A:10:9F:28"
+
+//#define SERV_ADDR "00:19:0E:10:72:CB"
+#define SERV_ADDR "00:1A:7D:DA:71:06"
+//#define SERV_ADDR "DC:53:60:AD:61:90"
 #define TEAM_ID     10
+
+#define SMALL 0
+#define BIG 1
+
+
 
 #define MSG_ACK     0
 #define MSG_START    1
@@ -24,8 +37,12 @@
 #define MSG_OBSTACLE 7
 #define Sleep( msec ) usleep(( msec ) * 1000 )
 
+
 int s;
 uint16_t msgId = 0;
+
+extern Pixel big_map[78][100];
+extern Pixel small_map[40][24];
 
 void debug (const char *fmt, ...) {
   va_list argp;
@@ -75,10 +92,10 @@ int read_from_server (int sock, char *buffer, size_t maxSize) {
 
 
 void send_position (double x, double y) {
-  printf("I'm sending my position...\n");
+  //printf("I'm sending my position...\n");
   char string[9];
-  int i = floor(x);
-  int j = floor(y);
+  int i = floor(x/5.0);
+  int j = floor(y/5.0);
   char ci[2];
   char cj[2];
   *((int16_t *) ci) = (int16_t) i;
@@ -92,20 +109,20 @@ void send_position (double x, double y) {
   string[7] = cj[0];           
   string[8] = cj[1];         
   write(s, string, 9);
-  printf("Done sending my position...\n");
+  //printf("Done sending my position...\n");
 }
 
 void send_obstacle(double x, double y, int act) {
-  if act==0{
+  if (act==0){
   	printf("I've released an osbtacle at %d,%d\n", x,y);
   }
   else {
 	printf("I've picked an osbtacle at %d,%d\n", x,y);
   }
 
-  char string[9];
-  int i = floor(x);
-  int j = floor(y);
+  char string[10];
+  int i = floor(x/5.0);
+  int j = floor(y/5.0);
   char ci[2];
   char cj[2];
   *((int16_t *) ci) = (int16_t) i;
@@ -114,50 +131,70 @@ void send_obstacle(double x, double y, int act) {
   string[2] = TEAM_ID;
   string[3] = 0xFF;
   string[4] = MSG_OBSTACLE;
-  string[5] = act;
+  string[5] = (char)act;
   string[6] = ci[0];
   string[7] = ci[1];
   string[8] = cj[0];           
   string[9] = cj[1];         
-  write(s, string, 9);
+  write(s, string, 10);
   printf("I've sent the position of the obstacle...\n");
 }
   
 
 void send_map_done(void) {
-  char string[4];
+  char string[5];
   *((uint16_t *) string) = msgId++;
   string[2] = TEAM_ID;
   string[3] = 0xFF;
   string[4] = MSG_MAPDONE;
-  write(s, string, 4);
-  printf("My map is complete, I will send it to the server\n");
+  write(s, string, 5);
+  printf("My map is complete, I sent it to the server\n");
 }
 
-void send_map(pixel map[100][100]) {
-  printf("Sending my map...\n")
-  char string[11];
+void send_map(int map_type) {
+  printf("Sending my map...\n");
+  char string[12];
+*((uint16_t *) string) = msgId++;
   string[2] = TEAM_ID;
   string[3] = 0xFF;
   string[4] = MSG_MAPDATA;
-  int i,j
-  for (i=0 ; i<100 ; i++) {
-	for (j=0 ; j<100 ; j++) {
-		int x = floor(map[i][j]->x);
-  		int y = floor(map[i][j]->y);
-        	char ci[2];
+  int i,j;
+  int lim_i;
+  int lim_j;
+  if (map_type == SMALL) {
+	lim_i = 40;
+	lim_j = 24;
+  }
+  else {
+	lim_i = 78;
+	lim_j = 78;	
+  }
+  for (i=0 ; i<lim_i ; i++) {
+	for (j=0 ; j<lim_j ; j++) {
+		if (((map_type == SMALL) && (small_map[i][j].G == 100)) || ((map_type == BIG) && (big_map[i][j].G == 100))) {
+		int x = j;
+  		int y = i;
+		char ci[2];
         	char cj[2];
   		*((int16_t *) ci) = (int16_t) i;
   	 	*((int16_t *) cj) = (int16_t) j;
-  	 	*((uint16_t *) string) = msgId++;
-		string[5] = ci[0];
-  		string[6] = ci[1];
-  	 	string[7] = cj[0];           
-  	 	string[8] = cj[1];  		
-		string[9] = map[i][j]->R;
-		string[10] = map[i][j]->G;
-		string[11] = map[i][j]->B;
-		write(s,string,11);
+		string[5] = cj[0];
+  		string[6] = cj[1];
+  	 	string[7] = ci[0];           
+  	 	string[8] = ci[1];
+		if (map_type == SMALL) {  		
+			string[9] = small_map[i][j].R;
+			string[10] = small_map[i][j].G;
+			string[11] = small_map[i][j].B;
+		}
+		else {
+			string[9] = big_map[i][j].R;
+                        string[10] = big_map[i][j].G;
+                        string[11] = big_map[i][j].B;
+		}
+		write(s,string,12);
+		Sleep(1);
+		}
 	}
   }
   printf("Done sending my map !\n");

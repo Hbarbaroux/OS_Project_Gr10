@@ -13,8 +13,6 @@
 #include "ev3_port.h"
 #include "ev3_sensor.h"
 #include "ev3_tacho.h"
-#include "communication.h"
-#include "motor.h"
 
 // WIN32 /////////////////////////////////////////
 #ifdef __WIN32__
@@ -59,7 +57,7 @@ const char const *color_list[] = { "?", "BLACK", "BLUE", "GREEN", "YELLOW", "RED
 
 
 #define RELEASING_TIME 10000
-#define DETECTION_DISTANCE 100
+#define DETECTION_DISTANCE 50
 
 uint8_t sonar, color;
 
@@ -77,7 +75,7 @@ int there_is_obstacle() {
 int distance_to_obstacle() {
 	float dist_value;
 	get_sensor_value0(sonar, &dist_value);
-	return dist_value;
+	return (int) dist_value;
 }
 
 int what_kind_of_obstacle() {

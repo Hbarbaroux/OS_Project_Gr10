@@ -3,11 +3,11 @@
 #include <time.h>
 #include <pthread.h>
 #include <math.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <stdarg.h>
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/rfcomm.h>
+#include <sys/socket.h>/
+#include <unistd.h>/
+#include <stdarg.h> /
+#include <bluetooth/bluetooth.h> /
+#include <bluetooth/rfcomm.h>   /
 #include "coroutine.h"
 #include "ev3.h"
 #include "ev3_port.h"

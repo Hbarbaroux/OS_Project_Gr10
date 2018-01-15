@@ -13,7 +13,8 @@
 #include "ev3_port.h"
 #include "ev3_sensor.h"
 #include "ev3_tacho.h"
-#include "communication.h"
+#include "move_functions.h"
+
 
 // WIN32 /////////////////////////////////////////
 #ifdef __WIN32__
@@ -46,12 +47,11 @@
 #define R_MOTOR_EXT_PORT  EXT_PORT__NONE_
 #define IR_CHANNEL        0
 
-#define SPEED_LINEAR      180
+#define SPEED_LINEAR      240
 #define SPEED_CIRCULAR    100
-#define SCAN_ANGLE		  40
+#define SCAN_ANGLE	  40
 int dist_to_obstacle = 100000;
 int final_angle;
-
 
 enum { L, R };
 
@@ -60,33 +60,26 @@ uint8_t ir;
 uint8_t motorLR[ 2 ] = { DESC_LIMIT, DESC_LIMIT};  /* Sequence numbers of motors */
 
 
+extern pthread_mutex_t mutexCompass;
+extern int angle_compass;
+extern int direction_us;
+
+
+
+
 //////////////////////
 // MOTORS FUNCTIONS //
 //////////////////////
 
 
-
-static void _set_mode( int value )
-{
-	if ( value == MODE_AUTO ) {
-		/* IR measuring of distance */
-		set_sensor_mode_inx( ir, LEGO_EV3_IR_IR_PROX );
-		mode = MODE_AUTO;
-	} else {
-		/* IR remote control */
-		set_sensor_mode_inx( ir, LEGO_EV3_IR_IR_REMOTE );
-		mode = MODE_REMOTE;
-	}
-}
-
-static void _run_forever( int l_speed, int r_speed )
+void _run_forever( int l_speed, int r_speed )
 {
 	set_tacho_speed_sp( motorLR[ L ], l_speed );
 	set_tacho_speed_sp( motorLR[ R ], r_speed );
 	multi_set_tacho_command_inx( motorLR, TACHO_RUN_FOREVER );
 }
 
-static void _run_to_rel_pos( int l_speed, int l_pos, int r_speed, int r_pos )
+void _run_to_rel_pos( int l_speed, int l_pos, int r_speed, int r_pos )
 {
 	set_tacho_speed_sp( motorLR[ L ], l_speed );
 	set_tacho_speed_sp( motorLR[ R ], r_speed );
@@ -95,7 +88,7 @@ static void _run_to_rel_pos( int l_speed, int l_pos, int r_speed, int r_pos )
 	multi_set_tacho_command_inx( motorLR, TACHO_RUN_TO_REL_POS );
 }
 
-static void _run_timed( int l_speed, int r_speed, int ms )
+void _run_timed( int l_speed, int r_speed, int ms )
 {
 	set_tacho_speed_sp( motorLR[ L ], l_speed );
 	set_tacho_speed_sp( motorLR[ R ], r_speed );
@@ -103,7 +96,7 @@ static void _run_timed( int l_speed, int r_speed, int ms )
 	multi_set_tacho_command_inx( motorLR, TACHO_RUN_TIMED );
 }
 
-static int _is_running( void )
+int _is_running( void )
 {
 	FLAGS_T state = TACHO_STATE__NONE_;
 
@@ -115,7 +108,7 @@ static int _is_running( void )
 	return ( 0 );
 }
 
-static void _stop( void )
+void _stop( void )
 {
 	multi_set_tacho_command_inx( motorLR, TACHO_STOP );
 
@@ -151,13 +144,13 @@ void turn_to_certain_direction (int direc) {
 	}
 
 	if (first > 0) {
-		_run_to_rel_pos(300,first,-300,(0-first));
+		_run_to_rel_pos(120,first,-120,(0-first));
 		while(_is_running());
 		_stop();
 	}
 
 	if (first < 0) {
-		_run_to_rel_pos(-300,first,300,(0-first));
+		_run_to_rel_pos(-120,first,120,(0-first));
 		while(_is_running());
 		_stop();
 	}
@@ -177,6 +170,10 @@ void turn_to_certain_direction (int direc) {
 		if ( is_pass_360 ) {
 			while( angle_compass <= 90  );
 		}
+		if(direc > 358) { direc = 358;}
+		else if (direc == 0) {
+			direc = 2;
+		}
 		while( angle_compass > direc  );
 		_stop();
 	}
@@ -186,6 +183,12 @@ void turn_to_certain_direction (int direc) {
 		Sleep(1);
 		if( is_pass_360 ) {
 			while( angle_compass >= 270 );
+		}
+		if(direc>358) {
+			direc = 358;
+		}
+		else if (direc == 0) {
+			direc = 2;
 		}
 		while( angle_compass < direc  );
 		_stop();
@@ -288,34 +291,105 @@ void turn_right() {
 	//printf("turning right 90 , previous= %d,   now=% d\n", original,angle_compass);
 }
 
-int searching_obstacle_right(){
+Pair searching_obstacle_right(){
 	int angle;
+	Pair mypair;
+	mypair.detected_angle = 400;
+	mypair.detected_distance = 1000;
+	
+	int original;
+	pthread_mutex_lock(&mutexCompass);
+        original=angle_compass;
+        pthread_mutex_unlock(&mutexCompass);
 
 	for (angle=0;angle<SCAN_ANGLE;angle=angle+5){
 		turn_right_certain_degree(5);
-		if (distance_to_obstacle()<dist_to_obstacle){
-			dist_to_obstacle=distance_to_obstacle();
-			final_angle=angle;
+		if (distance_to_obstacle()<mypair.detected_distance){
+			mypair.detected_distance=distance_to_obstacle();
+			pthread_mutex_lock(&mutexCompass);
+			mypair.detected_angle=angle_compass;
+			pthread_mutex_unlock(&mutexCompass);
 		}
 	}
 	Sleep(1000);
 
-	turn_left_certain_degree(SCAN_ANGLE);
-	return angle;
+
+	turn_to_certain_direction(original);
+	return mypair;
 }
 
-int searching_obstacle_left(){
+
+int searching_obstacle_right_array(Pair *obstacles, int index) {
+        int angle;
+	int distance;
+	Pair mypair;
+	int i = index;
+
+	int original;
+        pthread_mutex_lock(&mutexCompass);
+        original=angle_compass;
+        pthread_mutex_unlock(&mutexCompass);
+
+        for (angle=0;angle<SCAN_ANGLE;angle=angle+5){
+                turn_right_certain_degree(5);
+		distance = distance_to_obstacle();
+                if (distance<550){
+			mypair.detected_angle = angle;
+			mypair.detected_distance = distance;
+                        obstacles[i] = mypair;
+			i+=1;
+                }
+        }
+        Sleep(1000);
+	
+	turn_to_certain_direction(original);
+        return i;
+}
+
+Pair searching_obstacle_left(){
 	int angle;
+        Pair mypair;
+        mypair.detected_angle = 400;
+        mypair.detected_distance = 1000;
+
+	int original;
+        pthread_mutex_lock(&mutexCompass);
+        original=angle_compass;
+        pthread_mutex_unlock(&mutexCompass);
 
 	for (angle=0;angle<SCAN_ANGLE;angle=angle+5){
 		turn_left_certain_degree(5);
-		if (distance_to_obstacle()<dist_to_obstacle){
-			dist_to_obstacle=distance_to_obstacle();
-			final_angle=angle;
-		}
+		if (distance_to_obstacle()<mypair.detected_distance){
+                        mypair.detected_distance=distance_to_obstacle();
+                        pthread_mutex_lock(&mutexCompass);
+                        mypair.detected_angle=angle_compass;
+                        pthread_mutex_unlock(&mutexCompass);
+                }
 	}
 	Sleep(1000);
 
-	turn_right_certain_degree(SCAN_ANGLE);
-	return angle;
+	turn_to_certain_direction(original);
+	return mypair;
+}
+
+int searching_obstacle_left_array(Pair *obstacles, int index){
+        int angle;
+        int distance;
+        Pair mypair;
+        int i = index;
+
+        for (angle=0;angle<SCAN_ANGLE;angle=angle+5){
+                turn_left_certain_degree(5);
+        	distance = distance_to_obstacle();
+                if (distance<550){
+                        mypair.detected_angle = angle;
+                        mypair.detected_distance = distance;
+                        obstacles[i] = mypair;
+                        i+=1;
+                }
+	}
+        Sleep(1000);
+
+        turn_right_certain_degree(SCAN_ANGLE);
+        return i;
 }

@@ -13,8 +13,6 @@
 #include "ev3_port.h"
 #include "ev3_sensor.h"
 #include "ev3_tacho.h"
-#include "communication.h"
-#include "motor.h"
 
 // WIN32 /////////////////////////////////////////
 #ifdef __WIN32__

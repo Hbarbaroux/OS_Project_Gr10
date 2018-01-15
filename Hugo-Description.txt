@@ -1,0 +1,2 @@
+I have worked on integrating all the functions of the robot together. I particularly built threads for some functions that ave to work in parallel.
+I also worked on implementing the mapping algorithms (for both arenas). For the first one, as we know its shape, the idea is to move and scan for obstacles, and go to them once the robot sees some. For the big arena, we don’t know its shape, so the robot has to draw it first, by following the fences. After that, it can do the same scanning algorithm than for the small arena.

@@ -13,8 +13,11 @@
 #include "ev3_port.h"
 #include "ev3_sensor.h"
 #include "ev3_tacho.h"
-#include "communication.h"
-#include "motor.h"
+#include "bt_communication.h"
+#include "mapping_functions.h"
+#include "move_functions.h"
+#include "obstacle_detection.h"
+#include "move_obstacle.h"
 
 // WIN32 /////////////////////////////////////////
 #ifdef __WIN32__
@@ -36,6 +39,16 @@
 // GLOBAL VARIABLES //
 //////////////////////
 
+#define MSG_ACK     0
+#define MSG_START    1
+#define MSG_STOP   2
+#define MSG_KICK    3
+#define MSG_POSITION 4
+#define MSG_MAPDATA     5
+#define MSG_MAPDONE 6
+#define MSG_OBSTACLE 7
+#define Sleep( msec ) usleep(( msec ) * 1000 )
+#define TEAM_ID 10
 
 #define M_PI 3.14159265358979323846
 
@@ -52,7 +65,7 @@
 #define SPEED_LINEAR      180
 #define SPEED_CIRCULAR    100
 
-const char const *color_list[] = { "?", "BLACK", "BLUE", "GREEN", "YELLOW", "RED", "WHITE", "BROWN" };
+extern const char const *color_list[];
 #define COLOR_COUNT  (( int )( sizeof( color_list ) / sizeof( color_list[ 0 ])))
 
 #define MOD(a,b) ((((a)%(b))+(b))%(b))
@@ -62,9 +75,19 @@ const char const *color_list[] = { "?", "BLACK", "BLUE", "GREEN", "YELLOW", "RED
 #define RELEASING_TIME 10000
 #define DETECTION_DISTANCE 100
 
+#define SMALL 0
+#define BIG 1
+
+#define EMPTY 0
+#define OBSTACLE_WALL 1
+#define UNDEFINED 2
+
 int app_alive;
 int max_speed;  /* Motor maximal speed */
 int back_arm_max_speed;
+
+enum { L , R };
+enum { M , S };
 
 enum {
 	MODE_REMOTE,  /* IR remote control */
@@ -87,15 +110,17 @@ int moving;   /* Current moving */
 int command;  /* Command for the 'drive' coroutine */
 
 uint8_t compass, touch;  /* Sequence  of sensors */
-extern uint8_t sonar, color, ir
+extern uint8_t sonar, color, ir;
 
 
 extern uint8_t motorLR[ 2 ], motorMS[ 2 ];
 
 extern double x,y;
-extern struct pixel;
-extern pixel map[100][100];
 
+extern Pixel **small_map;
+extern Pixel **big_map;
+int map_type;
+int cell_type = UNDEFINED;
 int angle = 0;
 int s;
 char string[9];
@@ -109,9 +134,9 @@ pthread_mutex_t mutexCoord = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutexAng = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutexStop = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutexCompass = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutexCell = PTHREAD_MUTEX_INITIALIZER;
 
 
-}
 
 
 ////////////////////
@@ -123,7 +148,7 @@ int app_init( void )
 {
 	char s[ 16 ];
 
-	if ( ev3_search_tacho_plugged_in( L_MOTOR_PORT, L_MOTOR_EXT_PORT, motor + L, 0 )) {
+	if ( ev3_search_tacho_plugged_in( L_MOTOR_PORT, L_MOTOR_EXT_PORT, motorLR + L, 0 )) {
 		get_tacho_max_speed( motorLR[ L ], &max_speed );
 		/* Reset the motor */
 		set_tacho_command_inx( motorLR[ L ], TACHO_RESET );
@@ -132,7 +157,7 @@ int app_init( void )
 		/* Inoperative without left motor */
 		return ( 0 );
 	}
-	if ( ev3_search_tacho_plugged_in( R_MOTOR_PORT, R_MOTOR_EXT_PORT, motor + R, 0 )) {
+	if ( ev3_search_tacho_plugged_in( R_MOTOR_PORT, R_MOTOR_EXT_PORT, motorLR + R, 0 )) {
 		/* Reset the motor */
 		set_tacho_command_inx( motorLR[ R ], TACHO_RESET );
 	} else {
@@ -141,7 +166,7 @@ int app_init( void )
 		return ( 0 );
 	}
 
-	 if ( ev3_search_tacho_plugged_in( M_MOTOR_PORT, M_MOTOR_EXT_PORT, motor + M, 0 )) {
+	 if ( ev3_search_tacho_plugged_in( M_MOTOR_PORT, M_MOTOR_EXT_PORT, motorMS + M, 0 )) {
                 get_tacho_max_speed( motorMS[ M ], &back_arm_max_speed );
                 /* Reset the motor */
                 set_tacho_command_inx( motorMS[ M ], TACHO_RESET );
@@ -151,7 +176,7 @@ int app_init( void )
                 return ( 0 );
         }
 
-	 if ( ev3_search_tacho_plugged_in( S_MOTOR_PORT, S_MOTOR_EXT_PORT, motor + S, 0 )) {
+	 if ( ev3_search_tacho_plugged_in( S_MOTOR_PORT, S_MOTOR_EXT_PORT, motorMS + S, 0 )) {
                 //get_tacho_max_speed( motor[ S ], &max_speed );
                 /* Reset the motor */
                 set_tacho_command_inx( motorMS[ S ], TACHO_RESET );
@@ -203,45 +228,13 @@ void *thread_set_coord(void *arg) {
     	    diff = (0.1)*((double)speed1*M_PI*5.5/360.0+1);
             pthread_mutex_lock (&mutexCoord);
             pthread_mutex_lock (&mutexAng);
-            update_coord(diff,angle);
+            update_coord_compass(diff,angle);
             pthread_mutex_unlock (&mutexAng);
             pthread_mutex_unlock (&mutexCoord);
         }
     }
     pthread_exit(NULL);
 }
-
-
-// Thread to be used with update_coord_compass
-/*
-void *thread_set_coord(void *arg) {
-    double diff;
-    int speed1;
-    int speed2;
-    for (;;) {
-        pthread_mutex_lock (& mutexCompass );
-        int angle_before = angle_compass;
-        pthread_mutex_unlock (& mutexCompass );
-        Sleep(50);
-        pthread_mutex_lock (& mutexCompass );
-        int angle_after = angle_compass;
-        pthread_mutex_unlock (& mutexCompass );
-        get_tacho_speed_sp(motor[L],&speed1);
-        get_tacho_speed_sp(motor[R],&speed2);
-        if ((speed1 != 0) && (speed1 == speed2)) {
-            diff = (0.1)*((double)speed1*M_PI*5.5/360.0+1);
-            pthread_mutex_lock (&mutexCoord);
-            pthread_mutex_lock (&mutexAng);
-            update_coord_compass(diff, (int) (angle_after + angle_before)/2)	;
-            pthread_mutex_unlock (&mutexAng);
-            pthread_mutex_unlock (&mutexCoord);
-        }
-    }
-    pthread_exit(NULL);
-}
-*/
-
-
 
 void *thread_send_position(void *arg)
 {
@@ -296,6 +289,28 @@ void *thread_read_compass(void *arg) {
     pthread_exit(NULL);
 }
 
+void *thread_draw_map(void *arg) {
+	if (map_type == SMALL) {
+		for(;;) {
+			Sleep(700);
+			pthread_mutex_lock (& mutexCoord);
+			pthread_mutex_lock (& mutexCell);
+			draw_map(small_map,y,x,cell_type);
+			pthread_mutex_unlock (& mutexCoord);
+			pthread_mutex_unlock (& mutexCell);
+		}
+	}
+	else {
+		for(;;) {
+                        Sleep(700);
+                        pthread_mutex_lock (& mutexCoord);
+                        pthread_mutex_lock (& mutexCell);
+                        draw_map(big_map,y,x,cell_type);
+                        pthread_mutex_unlock (& mutexCoord);
+                        pthread_mutex_unlock (& mutexCell);
+                }
+	}
+}
 
 
 ///////////////////
@@ -303,7 +318,7 @@ void *thread_read_compass(void *arg) {
 ///////////////////
 
 
-int main( void )
+int main( int map_type_eff )
 {
 
 	// DECLARATIONS //
@@ -314,11 +329,12 @@ int main( void )
 	double diff_sec,diff_cm;
 	int i;
 	int realSpeed;
-    double diff;
-    struct sockaddr_rc addr = { 0 };
-    int status;
-    int temp;
+   	 double diff;
+    	struct sockaddr_rc addr = { 0 };
+    	int status;
+    	int temp;
 	int speed = 180;
+	map_type = map_type_eff;
 
 	//////////////////
 
@@ -359,6 +375,7 @@ int main( void )
 	pthread_t threadReadServer;
 	pthread_t threadReadCompass;
 	pthread_t threadNonMovable;
+	pthread_t threadDrawMap;
 
 	if (pthread_create(&threadNonMovable, NULL, thread_non_movable, NULL)) {
         perror("pthread_create for thread_non_movable\n");
@@ -385,13 +402,19 @@ int main( void )
     	return EXIT_FAILURE;
     } 
 
+	if (pthread_create(&threadDrawMap, NULL, thread_draw_map, NULL)) {
+        perror("pthread_create for thread_draw_map\n");
+        return EXIT_FAILURE;
+    }
+
+
     //////////////////////////////////
 
 
 
 	// INITIALIZATION OF THE ROBOT //
 
-	reset_coord();
+	reset_coord_small_map();
 	printf("(%f,%f)\n",x,y);
 	srand(time(NULL));
 
@@ -481,6 +504,9 @@ int main( void )
 			Sleep(2000);
 			turn_left();
 			while(_is_running());
+			pthread_mutex_lock(& mutexCell);
+			cell_type = EMPTY;
+			pthread_mutex_unlock(& mutexCell);
 		}
 		else {
 			randomBit = rand() % 2;
@@ -494,6 +520,10 @@ int main( void )
 				angle = MOD(angle+1,4);
 			}
 			pthread_mutex_unlock (&mutexAng);
+			pthread_mutex_lock(& mutexCell);
+                        cell_type = OBSTACLE_WALL;
+                        pthread_mutex_unlock(& mutexCell);
+
 			Sleep(3000);
 		}
 

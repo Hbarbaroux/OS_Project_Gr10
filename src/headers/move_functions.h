@@ -21,3 +21,7 @@ void turn_left(void);
 void turn_right(void);
 
 
+typedef struct pair {
+	int detected_angle;
+	int detected_distance;
+} Pair;

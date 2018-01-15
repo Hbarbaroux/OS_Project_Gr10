@@ -7,7 +7,14 @@
 #include <sys/socket.h>
 #include <bluetooth/bluetooth.h>
 #include <bluetooth/rfcomm.h>
+
+
+#ifndef MAPPING
+#define MAPPING
+
 #include "mapping_functions.h"
+
+#endif
 
 
 void read_from_server(int sock, char *buffer, size_t maxSize);
@@ -18,7 +25,7 @@ void send_obstacle(double x, double y, int act);
 
 void send_map_done(void);
 
-void send_map_data(pixel map[100][100]);
+void send_map(int map_type);
 
 int connect_server(void);
 
