@@ -20,6 +20,11 @@ void turn_left(void);
 
 void turn_right(void);
 
+int searching_obstacle_right_array(Pair *obstacles, int index); //Made by Pawel & modified by Hugo.
+	//Both these functions (this one and the one below) are used to look around for searching obstacles. It turns for and scans by ultrasonic sensor and returns the closest values. After reaching the max angle it goes back to initial position.
+int searching_obstacle_left_array(Pair *obstacles, int index); // Made by Pawel & modified by Hugo.
+	
+
 
 typedef struct pair {
 	int detected_angle;
