@@ -16,44 +16,83 @@
 <body>
      <h1>Robot Optimus!</h1>
 
-     <h2>
-     Our first attempt of the robot:
-          <center>
-               <a href="./photos/robot1.jpg">
-                    <img src="./photos/robot1.jpg" width="400">
+          <h2>
+               Architecture!
+          </h2>
+
+               We decided to use 3 sensors and 4 motors. The first sensor is ultrasonic to check the distance to obstacles due to we can not bump into them. The second one is color sensor to recognise what kind obstacle do we handle. The last one is compas sensor. It is used to make precisize rotation. <br>
+               We used two large motors to initiate wheels, so we can turn around by changing the rotation. The third large motor is used to release the obstacle. The medium motor is used to put down and up the front frame to catch the obstacle. <br>
+
+               <center>
+                    <h2>
+                    <a href="./photos/robot_without_flag1.jpg">
+                    <img src="./photos/robot_without_flag1.jpg" width="600">
                     </a>
-          </center><br><br>
+                    <br>    Thats our robot without flag, the side look.<br>
 
-     But finally we agreed on:
-          <center>
-                    <a href="./photos/robot_final.jpg">
-                         <img src="./photos/robot_final.jpg" width="600">
-                         </a>
-          </center><br><br>
-
-
-     Suddenly we realized that our robot could be stucked!
-          <center>
-               <a href="./photos/stuck.jpg">
-                    <img src="./photos/stuck.jpg" width="600">
+                    <a href="./photos/robot_without_flag2.jpg"> 
+                    <img src="./photos/robot_without_flag2.jpg" width="600">
                     </a>
-          </center><br><br>
+                    <br>     The front look with the lowered frame.<br>
+                    </h2>
+               </center>
+
+          <h2>
+               Algorithms!
+          </h2>
+
+          <h3>
+               We have two main algorithms for cartography strategy, the one for big area and the one for small one. </h3><br>
+
+               <br><br>
+               <h3>Big Area Algorithm:<br></h3>
+               <div style="text-indent: 1.25cm">     -Going along the fences to create a map of whole area. <br>
+               <div style="text-indent: 1.25cm">     -When there is an obstacle near the fence walk it around and continue fence exploration.<br>
+               <div style="text-indent: 1.25cm">     -Once the fence exploration is finished check unknown points for the map and follow the obstacle hunting algorithm. <br><br>
+               </div></div></div>
+               <h4>
+                    We think the strong part of this algorithm is that, we will have fences of the stadium really fast. After that it will be easy to scan the area to get positions of obstacle and precisize theirs location. 
+               </h4>
+
+               <h3>Small Area Algorithm:<br></h3>
+               <div style="text-indent: 1.25cm">     -Fences of the area are known, so start the obstacle hunting algorithm.<br>
+               <div style="text-indent: 1.25cm">     -Go through the middle of the area and scan around.<br>
+               <div style="text-indent: 1.25cm">     -Map every seen obstacle and after thet to to theirs positions to get the most accurate values of the position.<br><br>
+               </div></div></div>
+               <h4>
+                    As far as we know the fences it is a good idea to scan the stadium to find obstacles and mark them on the map.
+               </h4>
+
+               <h3>Obstacle Hunting Algorithm:<br></h3>
+               <div style="text-indent: 1.25cm">     -Scan around and map every seen obstacle.<br>
+               <div style="text-indent: 1.25cm">     -Follow the mapped obstacles to get theirs positions.<br>
+               <div style="text-indent: 1.25cm">     -Randomly choose obstacles to check them.<br><br>
+               </div></div></div>
+
+               <h3>Handling with obstacles:<br></h3>
+               <div style="text-indent: 1.25cm">     -When ultrasonic sensor detects something in front of the robot it stops.<br>
+               <div style="text-indent: 1.25cm">     -Robot checks the color of the obstacle and decides if its movable or not.<br>
+               <div style="text-indent: 1.25cm">     -If the obstacle is movable it chaches the obstacle and put behind the robot, otherwise it recognizes as nonmovable and will not touch it. <br><br>
+               </div></div></div>
+               <h4>
+                    In that algorithm we wanted to handle the movable obstacles. 
+               </h4>
+
+               <h2>Source code!</h2><br>
+               <center>
+                    <h4>Our whole code is on the public github</h4>
+                    <h4>Link to our github: <a href="https://github.com/Hbarbaroux/OS_Project_Gr10">Github </a></h4>
+               </center>
+
+               <h3>Compilation:</h3>
+               We assumed that users can easily connect to the robots and clone github repository. <br>
+               <div style="text-indent: 1.25cm"> -Move to proper directory (the cloned one).<br>
+               <div style="text-indent: 1.25cm"> -Run "make" command.<br>
+               <div style="text-indent: 1.25cm"> -Execute the "./main map_type area".<br>
+               <div style="text-indent: 1.25cm"> map_type argument requires "0" for small stadium or "1" for big stadium.<br>
+               <div style="text-indent: 1.25cm"> area argument is for the starting position. "0" is for the left position, "1" is for right one.<br>
 
 
-     We drunk a coffee and though again about the problem...
-          <center>
-               <a href="./photos/team_work.jpg">
-                    <img src="./photos/team_work.jpg" width="600">
-                    </a>
-          </center><br><br>
 
-
-     So far it looks like this:
-          <center>
-               <a href="./photos/robot_arena.jpg">
-                    <img src="./photos/robot_arena.jpg" width="600">
-                    </a>
-          </center><br><br>
-     </h2>
 </body>
 </html>
