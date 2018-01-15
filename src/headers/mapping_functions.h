@@ -10,13 +10,13 @@ typedef struct pixel {
 } Pixel;
 
 //Set the initial coordinates according to the type (small/big) of map and for the big one the starting area (right/left)
-void reset_coord(int map_type, int area);
+void reset_coord(int map_type, int area);// Made by Hugo
 
 //First version of the update of the coordinates when considering only trajectories to N,S,E,W
-void update_coord(double diff, int angle);
+void update_coord(double diff, int angle);// Made by Hugo
 
 //Second version that takes into account angles different from N,S,E,W
-void update_coord_compass(double diff, double angle);
+void update_coord_compass(double diff, double angle); // Made by Hugo
 
 //Update a specific pixel on the map when an obstacle has been encountered
 void draw_map(int m, int n, Pixel map[m][n],int i, int j, int type);
