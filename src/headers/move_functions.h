@@ -24,11 +24,16 @@ void turn_left_certain_degree(int degree);
 //for accurately turning
 
 void turn_left(int degree);
-//tuning version for scaning version
+//tuning version for scaning version.
 
 void turn_right(int degree);
-//tuning version for scaning version
+//tuning version for scaning version.
 
+void turn_left();
+//tuning 90 degree excatly.
+
+void turn_right();
+//tuning 90 degree excatly.
 
 int searching_obstacle_right_array(Pair *obstacles, int index); //Made by Pawel & modified by Hugo.
 	//Both these functions (this one and the one below) are used to look around for searching obstacles. It turns for and scans by ultrasonic sensor and returns the closest values. After reaching the max angle it goes back to initial position.
