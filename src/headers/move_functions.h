@@ -1,5 +1,5 @@
 //this part is responsible by Jianzhong LIANG
-//used to perceive the current position and make next movement accurately, in charge of the use of motor for wheel and the compass sensor.
+//used to perceive the current position and make next movement accurately, in charge of the use of motor and the compass sensor.
 void _set_mode( int value );
 
  void _run_forever( int l_speed, int r_speed );
@@ -12,22 +12,22 @@ void _set_mode( int value );
 
  void _stop( void );
 
-void turn_to_certain_direction (int direc);// by Jianzhong, implement the accurate rotation.
+void turn_to_certain_direction (int direc);// implement the accurate rotation.
 // accurate rotate with the accuracy of +-1 degree, implement the feedback to keep robot heading to certain degree excatly.
 
-void keep_go_straight (int distance);// by Jianzhong
+void keep_go_straight (int distance);
 
-void turn_right_certain_degree(int degree);// by Jianzhong 
+void turn_right_certain_degree(int degree); 
 //for accurately turning, some tuning for general utilization, some trade off in adjust time and speed.
 
-void turn_left_certain_degree(int degree);// by Jianzhong
+void turn_left_certain_degree(int degree);
 //for accurately turning
 
 void turn_left(int degree);
-// by Jianzhong, tuning version for scaning version
+//tuning version for scaning version
 
 void turn_right(int degree);
-// by Jianzhong, tuning version for scaning version
+//tuning version for scaning version
 
 
 int searching_obstacle_right_array(Pair *obstacles, int index); //Made by Pawel & modified by Hugo.
