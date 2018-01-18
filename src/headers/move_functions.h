@@ -15,7 +15,7 @@ void _set_mode( int value );
 void turn_to_certain_direction (int direc);// implement the accurate rotation.
 // accurate rotate with the accuracy of +-1 degree, implement the feedback to keep robot heading to certain degree excatly.
 
-void keep_go_straight (int distance);
+//void keep_go_straight (int distance);
 
 void turn_right_certain_degree(int degree); 
 //for accurately turning, some tuning for general utilization, some trade off in adjust time and speed.
@@ -23,10 +23,10 @@ void turn_right_certain_degree(int degree);
 void turn_left_certain_degree(int degree);
 //for accurately turning
 
-void turn_left(int degree);
+//void turn_left(int degree);
 //tuning version for scaning version.
 
-void turn_right(int degree);
+//void turn_right(int degree);
 //tuning version for scaning version.
 
 void turn_left();
